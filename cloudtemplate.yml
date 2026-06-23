@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 Monitoring with CloudWatch
+
+Resources:
+
+  MonitoringSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  MonitoringInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+
+      ImageId: ami-0f58b397bc5c1f2e8
+
+      SecurityGroupIds:
+        - !Ref MonitoringSecurityGroup
+
+      Tags:
+        - Key: Name
+          Value: CloudWatch-Monitoring-Server
+
+  CPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: CPU Utilization above 70%
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref MonitoringInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: EC2MonitoringDashboard
+      DashboardBody: !Sub |
+        {
+          "widgets":[
+            {
+              "type":"metric",
+              "x":0,
+              "y":0,
+              "width":12,
+              "height":6,
+              "properties":{
+                "metrics":[
+                  ["AWS/EC2","CPUUtilization","InstanceId","${MonitoringInstance}"]
+                ],
+                "period":300,
+                "stat":"Average",
+                "region":"${AWS::Region}",
+                "title":"EC2 CPU Monitoring"
+              }
+            }
+          ]
+        }
+
+Outputs:
+
+  InstanceId:
+    Value: !Ref MonitoringInstance
+
+  DashboardName:
+    Value: EC2MonitoringDashboard
